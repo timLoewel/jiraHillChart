@@ -1,65 +1,75 @@
 import { createBdd } from 'playwright-bdd';
 import { expect } from '@playwright/test';
+import * as mockJira from '../../src/services/jira.mock';
 
 const { Given, When, Then } = createBdd();
 
-// This is a mock. In a real scenario, you would not expose your token like this.
-// It would be handled via environment variables or a secure vault.
-const JIRA_HOST = 'https://your-jira.atlassian.net';
-const JIRA_TOKEN = 'your-token';
+const MOCK_HOST = 'https://mock-jira.example.com';
+const MOCK_TOKENS = {
+  user1: 'valid-token-for-user1',
+  user2: 'valid-token-for-user2',
+};
 
+// Setup a global mock for all scenarios in this file
 Given('I am on the login page', async ({ page }) => {
+  // Intercept network requests to the Jira API and fulfill them with our mock service
+  await page.route('**/rest/api/3/myself', async (route) => {
+    const request = route.request();
+    const headers = await request.allHeaders();
+    const authHeader = headers['authorization'] || '';
+    const token = authHeader.replace('Bearer ', '');
+
+    try {
+      const user = await mockJira.verifyTokenAndGetUser(MOCK_HOST, token);
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(user),
+      });
+    } catch (error: any) {
+      route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: error.message }),
+      });
+    }
+  });
+
   await page.goto('/');
   await expect(page.locator('h2')).toHaveText('Jira Login');
 });
 
-When('I enter my Jira host and a valid personal access token', async ({ page }) => {
-  await page.locator('input[id="jiraHost"]').fill(JIRA_HOST);
-  await page.locator('input[id="token"]').fill(JIRA_TOKEN);
+When('I enter the mock Jira host and the token for {string}', async ({ page }, userKey: keyof typeof MOCK_TOKENS) => {
+  const token = MOCK_TOKENS[userKey];
+  await page.locator('input[id="jiraHost"]').fill(MOCK_HOST);
+  await page.locator('input[id="token"]').fill(token);
+});
+
+When('I enter the mock Jira host and an {string}', async ({ page }, token: string) => {
+  await page.locator('input[id="jiraHost"]').fill(MOCK_HOST);
+  await page.locator('input[id="token"]').fill(token);
 });
 
 When('I click the "Login" button', async ({ page }) => {
-  // In a real test, we would need to mock the API call to avoid hitting a real Jira instance.
-  // For this example, we assume the happy path where the login will succeed.
-  // We will mock the response from the Jira API.
-  await page.route('**/rest/api/3/myself', route => {
-    route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        displayName: 'Test User',
-        avatarUrls: {
-          '48x48': 'https://via.placeholder.com/48',
-        },
-      }),
-    });
-  });
-
   await page.locator('button[type="submit"]').click();
 });
 
-Then('I should see my user avatar', async ({ page }) => {
+Then('I should see the avatar and name for {string}', async ({ page }, displayName: string) => {
   await expect(page.locator('img[alt="User Avatar"]')).toBeVisible();
-  await expect(page.locator('p')).toContainText('Hello, Test User');
+  await expect(page.locator('p')).toContainText(`Hello, ${displayName}`);
 });
 
-Given('I am logged in', async ({ page }) => {
-  // This step combines the login actions to set up the state.
+Then('I should see a {string} error message', async ({ page }, errorMessage: string) => {
+  const errorLocator = page.locator('p[style="color: red;"]');
+  await expect(errorLocator).toBeVisible();
+  await expect(errorLocator).toContainText(errorMessage);
+});
+
+Given('I am logged in as {string}', async ({ page }, userKey: keyof typeof MOCK_TOKENS) => {
   await page.goto('/');
-  await page.route('**/rest/api/3/myself', route => {
-    route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        displayName: 'Test User',
-        avatarUrls: {
-          '48x48': 'https://via.placeholder.com/48',
-        },
-      }),
-    });
-  });
-  await page.locator('input[id="jiraHost"]').fill(JIRA_HOST);
-  await page.locator('input[id="token"]').fill(JIRA_TOKEN);
+  const token = MOCK_TOKENS[userKey];
+  await page.locator('input[id="jiraHost"]').fill(MOCK_HOST);
+  await page.locator('input[id="token"]').fill(token);
   await page.locator('button[type="submit"]').click();
   await expect(page.locator('img[alt="User Avatar"]')).toBeVisible();
 });
