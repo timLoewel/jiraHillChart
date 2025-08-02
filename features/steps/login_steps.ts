@@ -56,7 +56,7 @@ When('I click the "Login" button', async ({ page }) => {
 
 Then('I should see the avatar and name for {string}', async ({ page }, displayName: string) => {
   await expect(page.locator('img[alt="User Avatar"]')).toBeVisible();
-  await expect(page.locator('p')).toContainText(`Hello, ${displayName}`);
+  await expect(page.locator('.user-info span')).toContainText(`Hello, ${displayName}`);
 });
 
 Then('I should see a {string} error message', async ({ page }, errorMessage: string) => {

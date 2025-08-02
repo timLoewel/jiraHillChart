@@ -47,3 +47,40 @@ export async function verifyTokenAndGetUser(host: string, token: string): Promis
     }, 500);
   });
 }
+
+const mockTickets = {
+  'TICKET-1': {
+    id: 'TICKET-1',
+    fields: {
+      summary: 'Implement search feature',
+      description: 'Implement the search feature for tickets in the sidebar.',
+    },
+  },
+};
+
+export async function getTicket(host: string, token: string, ticketId: string): Promise<any> {
+  console.log(`Mock Jira Service: getTicket called with host: ${host}, token: ${token}, ticketId: ${ticketId}`);
+
+  return new Promise((resolve, reject) => {
+    // Simulate network delay
+    setTimeout(() => {
+      if (host !== 'https://mock-jira.example.com') {
+        return reject(new Error(`Host not found: ${host}`));
+      }
+
+      if (!(token in mockUsers)) {
+        return reject(new Error('Unauthorized: Invalid token'));
+      }
+
+      const ticket = (mockTickets as any)[ticketId];
+
+      if (ticket) {
+        console.log('Mock Jira Service: Found ticket', ticket);
+        resolve(ticket);
+      } else {
+        console.log('Mock Jira Service: Ticket not found');
+        reject(new Error(`Ticket not found: ${ticketId}`));
+      }
+    }, 500);
+  });
+}

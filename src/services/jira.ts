@@ -26,3 +26,28 @@ export async function verifyTokenAndGetUser(host: string, token: string): Promis
   const user = await response.json();
   return user;
 }
+
+export async function getTicket(host: string, token: string, ticketId: string): Promise<any> {
+  const url = `${host}/rest/api/3/issue/${ticketId}`;
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/json'
+    }
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized: Invalid token');
+    }
+    if (response.status === 404) {
+      throw new Error(`Ticket not found: ${ticketId}`);
+    }
+    throw new Error(`Failed to fetch ticket data. Status: ${response.status}`);
+  }
+
+  const ticket = await response.json();
+  return ticket;
+}
