@@ -66,6 +66,27 @@ Then('I should see a {string} error message', async ({ page }, errorMessage: str
 });
 
 Given('I am logged in as {string}', async ({ page }, userKey: keyof typeof MOCK_TOKENS) => {
+  await page.route('**/rest/api/3/myself', async (route) => {
+    const request = route.request();
+    const headers = await request.allHeaders();
+    const authHeader = headers['authorization'] || '';
+    const token = authHeader.replace('Bearer ', '');
+
+    try {
+      const user = await mockJira.verifyTokenAndGetUser(MOCK_HOST, token);
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(user),
+      });
+    } catch (error: any) {
+      route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: error.message }),
+      });
+    }
+  });
   await page.goto('/');
   const token = MOCK_TOKENS[userKey];
   await page.locator('input[id="jiraHost"]').fill(MOCK_HOST);
