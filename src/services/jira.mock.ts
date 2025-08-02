@@ -1,6 +1,5 @@
 /**
  * Mock Jira Service for testing purposes.
- * This service simulates the behavior of the real Jira API without making actual network requests.
  */
 
 // A simple mock database of users and their tokens.
@@ -25,25 +24,73 @@ const mockUsers = {
   },
 };
 
+const mockTickets = {
+    'PROJ-123': {
+        id: 'PROJ-123',
+        title: 'A really cool feature',
+        project: 'PROJ',
+        status: 'In Progress',
+    },
+    'PROJ-124': {
+        id: 'PROJ-124',
+        title: 'Another important task',
+        project: 'PROJ',
+        status: 'In Progress',
+    },
+    'PROJ-125': {
+        id: 'PROJ-125',
+        title: 'A cool bug fix',
+        project: 'PROJ',
+        status: 'In Progress',
+    },
+    'ANOTHER-1': {
+        id: 'ANOTHER-1',
+        title: 'Some other ticket',
+        project: 'ANOTHER',
+        status: 'In Progress',
+    }
+};
+
+function simulateDelay(ms: number = 500) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 export async function verifyTokenAndGetUser(host: string, token: string): Promise<any> {
-  console.log(`Mock Jira Service: verifyTokenAndGetUser called with host: ${host}, token: ${token}`);
+  await simulateDelay();
+  if (host !== 'https://mock-jira.example.com') {
+    throw new Error(`Host not found: ${host}`);
+  }
+  const user = (mockUsers as any)[token];
+  if (user) {
+    return user;
+  }
+  throw new Error('Unauthorized: Invalid token');
+}
 
-  return new Promise((resolve, reject) => {
-    // Simulate network delay
-    setTimeout(() => {
-      if (host !== 'https://mock-jira.example.com') {
-        return reject(new Error(`Host not found: ${host}`));
-      }
+export async function searchForInProgressTickets(project: string): Promise<any[]> {
+    await simulateDelay();
+    const tickets = Object.values(mockTickets).filter(
+        ticket => ticket.project === project && ticket.status === 'In Progress'
+    );
+    return tickets;
+}
 
-      const user = (mockUsers as any)[token];
+export async function getTicket(ticketId: string): Promise<any> {
+    await simulateDelay();
+    const ticket = (mockTickets as any)[ticketId];
+    if (ticket) {
+        return ticket;
+    }
+    throw new Error(`Ticket not found: ${ticketId}`);
+}
 
-      if (user) {
-        console.log('Mock Jira Service: Found user', user);
-        resolve(user);
-      } else {
-        console.log('Mock Jira Service: Token invalid');
-        reject(new Error('Unauthorized: Invalid token'));
-      }
-    }, 500);
-  });
+export async function updateTicketTitle(ticketId: string, newTitle: string): Promise<void> {
+    await simulateDelay();
+    const ticket = (mockTickets as any)[ticketId];
+    if (ticket) {
+        ticket.title = newTitle;
+        console.log(`Mock Jira: Updated ticket ${ticketId} title to "${newTitle}"`);
+        return;
+    }
+    throw new Error(`Ticket not found: ${ticketId}`);
 }
