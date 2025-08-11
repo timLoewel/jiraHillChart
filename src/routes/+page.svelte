@@ -1,59 +1,34 @@
 <script lang="ts">
-	import Counter from './Counter.svelte';
-	import welcome from '$lib/images/svelte-welcome.webp';
-	import welcomeFallback from '$lib/images/svelte-welcome.png';
+	import { enhance } from '$app/forms';
+	import type { ActionData } from './$types';
+
+	let { form }: { form: ActionData } = $props();
 </script>
 
-<svelte:head>
-	<title>Home</title>
-	<meta name="description" content="Svelte demo app" />
-</svelte:head>
-
-<section>
-	<h1>
-		<span class="welcome">
-			<picture>
-				<source srcset={welcome} type="image/webp" />
-				<img src={welcomeFallback} alt="Welcome" />
-			</picture>
-		</span>
-
-		to your new<br />SvelteKit app
-	</h1>
-
-	<h2>
-		try editing <strong>src/routes/+page.svelte</strong>
-	</h2>
-
-	<Counter />
-</section>
-
-<style>
-	section {
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
-		align-items: center;
-		flex: 0.6;
-	}
-
-	h1 {
-		width: 100%;
-	}
-
-	.welcome {
-		display: block;
-		position: relative;
-		width: 100%;
-		height: 0;
-		padding: 0 0 calc(100% * 495 / 2048) 0;
-	}
-
-	.welcome img {
-		position: absolute;
-		width: 100%;
-		height: 100%;
-		top: 0;
-		display: block;
-	}
-</style>
+<h1>Login/Register</h1>
+<form method="post" action="?/login" use:enhance>
+	<label>
+		Username
+		<input
+			name="username"
+			class="mt-1 rounded-md border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+		/>
+	</label>
+	<label>
+		Password
+		<input
+			type="password"
+			name="password"
+			class="mt-1 rounded-md border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+		/>
+	</label>
+	<button class="rounded-md bg-blue-600 px-4 py-2 text-white transition hover:bg-blue-700"
+		>Login</button
+	>
+	<button
+		formaction="?/register"
+		class="rounded-md bg-blue-600 px-4 py-2 text-white transition hover:bg-blue-700"
+		>Register</button
+	>
+</form>
+<p style="color: red">{form?.message ?? ''}</p>

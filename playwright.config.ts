@@ -1,4 +1,4 @@
-import { defineConfig } from '@playwright/test';
+import { defineConfig, devices } from '@playwright/test';
 import { defineBddConfig } from 'playwright-bdd';
 
 const testDir = defineBddConfig({
@@ -11,5 +11,8 @@ export default defineConfig({
 		command: 'npm run build && npm run preview',
 		port: 4173
 	},
-	testDir
+	testDir,
+	use: {
+		headless: true,
+	}
 });

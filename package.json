@@ -14,9 +14,10 @@
 		"lint": "prettier --check . && eslint .",
 		"test:unit": "vitest",
 		"test": "npm run test:unit -- --run && npm run test:e2e",
-		"test:e2e": "playwright test",
+		"test:setup": "rm -f db.sqlite && npm run db:push",
+		"test:e2e": "npm run test:setup && playwright test",
 		"test:bdd": "bddgen test && playwright test",
-		"db:push": "drizzle-kit push",
+		"db:push": "drizzle-kit push --force",
 		"db:generate": "drizzle-kit generate",
 		"db:migrate": "drizzle-kit migrate",
 		"db:studio": "drizzle-kit studio"

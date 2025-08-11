@@ -6,14 +6,18 @@ const { Given, When, Then } = createBdd();
 const username = `testuser_${Math.random().toString(36).substring(7)}`;
 const password = 'password123';
 
-Given('I am on the login page', async ({ page }) => {
-  await page.goto('/demo/lucia/login');
+Given('I am on the main page', async ({ page }) => {
+  await page.goto('/');
 });
 
 When('I register a new user', async ({ page }) => {
   await page.locator('input[name="username"]').fill(username);
   await page.locator('input[name="password"]').fill(password);
   await page.getByRole('button', { name: 'Register' }).click();
+});
+
+Then('I should be on the welcome page', async ({ page }) => {
+  await expect(page).toHaveURL('/welcome');
 });
 
 Then('I should see the welcome message', async ({ page }) => {
@@ -24,8 +28,8 @@ When('I click the "Sign out" button', async ({ page }) => {
   await page.getByRole('button', { name: 'Sign out' }).click();
 });
 
-Then('I should be on the login page', async ({ page }) => {
-  await expect(page).toHaveURL('/demo/lucia/login');
+Then('I should be on the main page', async ({ page }) => {
+  await expect(page).toHaveURL('/');
   await expect(page.locator('h1')).toHaveText('Login/Register');
 });
 
@@ -39,7 +43,7 @@ Then('I should see the welcome message again', async ({ page }) => {
     await expect(page.locator('h1')).toHaveText(`Hi, ${username}!`);
 });
 
-Then('I should be on the login page again', async ({ page }) => {
-    await expect(page).toHaveURL('/demo/lucia/login');
+Then('I should be on the main page again', async ({ page }) => {
+    await expect(page).toHaveURL('/');
     await expect(page.locator('h1')).toHaveText('Login/Register');
 });
