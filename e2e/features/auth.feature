@@ -1,12 +1,12 @@
 Feature: User Authentication
 
-  Scenario: Successful login
+  Scenario: Register, logout, and login
     Given I am on the login page
-    When I enter valid credentials
-    And I click the "Login" button
+    When I register a new user
     Then I should see the welcome message
-
-  Scenario: Successful logout
-    Given I am logged in
     When I click the "Sign out" button
     Then I should be on the login page
+    When I log in with the same user
+    Then I should see the welcome message again
+    When I click the "Sign out" button
+    Then I should be on the login page again
