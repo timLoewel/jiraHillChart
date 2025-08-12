@@ -1,0 +1,1 @@
+ALTER TABLE `user` ADD COLUMN `jira_api_key` text;

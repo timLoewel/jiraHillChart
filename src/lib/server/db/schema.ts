@@ -4,7 +4,8 @@ export const user = sqliteTable('user', {
 	id: text('id').primaryKey(),
 	age: integer('age'),
 	username: text('username').notNull().unique(),
-	passwordHash: text('password_hash').notNull()
+	passwordHash: text('password_hash').notNull(),
+	jiraApiKey: text('jira_api_key')
 });
 
 export const session = sqliteTable('session', {
