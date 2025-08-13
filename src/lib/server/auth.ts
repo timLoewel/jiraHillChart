@@ -5,6 +5,7 @@ import { encodeBase64url, encodeHexLowerCase } from '@oslojs/encoding';
 import { db } from '$lib/server/db';
 import * as table from '$lib/server/db/schema';
 import { decrypt } from '$lib/server/crypto';
+import { logger } from '$lib/server/logger';
 
 const DAY_IN_MS = 1000 * 60 * 60 * 24;
 
@@ -49,7 +50,23 @@ export async function validateSessionToken(token: string) {
 	const { session, user } = result;
 
 	if (user.jiraApiKey) {
-		user.jiraApiKey = decrypt(user.jiraApiKey);
+		try {
+			user.jiraApiKey = decrypt(user.jiraApiKey);
+			logger.info('Successfully decrypted Jira API key during session validation', {
+				operation: 'session_validation',
+				userId: user.id,
+				username: user.username
+			});
+		} catch (decryptError) {
+			logger.error('Failed to decrypt Jira API key during session validation', {
+				operation: 'session_validation',
+				userId: user.id,
+				username: user.username,
+				error: decryptError instanceof Error ? decryptError.message : 'Unknown error'
+			});
+			// Continue without the Jira API key rather than failing the entire session
+			user.jiraApiKey = null;
+		}
 	}
 
 	const sessionExpired = Date.now() >= session.expiresAt.getTime();

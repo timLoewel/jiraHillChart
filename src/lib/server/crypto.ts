@@ -5,6 +5,24 @@ const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
 const AUTH_TAG_LENGTH = 16;
 
+// Validate encryption key
+if (!JIRA_API_ENCRYPTION_KEY) {
+	throw new Error('JIRA_API_ENCRYPTION_KEY environment variable is not set');
+}
+
+if (JIRA_API_ENCRYPTION_KEY.length !== 64) {
+	throw new Error(`JIRA_API_ENCRYPTION_KEY must be 64 characters (32 bytes) hex string, got ${JIRA_API_ENCRYPTION_KEY.length} characters`);
+}
+
+try {
+	const key = Buffer.from(JIRA_API_ENCRYPTION_KEY, 'hex');
+	if (key.length !== 32) {
+		throw new Error(`Invalid key length: expected 32 bytes, got ${key.length} bytes`);
+	}
+} catch (err) {
+	throw new Error(`Invalid JIRA_API_ENCRYPTION_KEY: ${err instanceof Error ? err.message : 'Invalid hex string'}`);
+}
+
 const key = Buffer.from(JIRA_API_ENCRYPTION_KEY, 'hex');
 
 export function encrypt(text: string): string {
