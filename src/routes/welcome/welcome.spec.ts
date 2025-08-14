@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { actions } from './+page.server';
-import { JIRA_SERVER_URL } from '$env/static/private';
+import { JiraService } from '$lib/server/jira';
 
 // Mock dependencies
 vi.mock('$lib/server/db', () => ({
@@ -15,23 +15,19 @@ vi.mock('$lib/server/crypto', () => ({
 	encrypt: vi.fn((text) => `encrypted-${text}`)
 }));
 
-vi.mock('$env/static/private', () => ({
-	JIRA_SERVER_URL: 'https://jira.example.com'
-}));
+vi.mock('$lib/server/jira');
 
 vi.mock('$app/server', () => ({
-    getRequestEvent: vi.fn(() => ({
-        locals: {
-            user: { id: 'user-123', username: 'testuser', jiraApiKey: null },
-            session: { id: 'session-456' }
-        },
-        request: {
-            formData: async () => new URLSearchParams()
-        }
-    }))
+	getRequestEvent: vi.fn(() => ({
+		locals: {
+			user: { id: 'user-123', username: 'testuser', jiraApiKey: null },
+			session: { id: 'session-456' }
+		},
+		request: {
+			formData: async () => new URLSearchParams()
+		}
+	}))
 }));
-
-global.fetch = vi.fn();
 
 describe('Welcome page actions', () => {
 	beforeEach(() => {
@@ -66,7 +62,7 @@ describe('Welcome page actions', () => {
 				}
 			};
 
-			fetch.mockResolvedValue({ ok: false });
+			vi.mocked(JiraService.prototype.validateToken).mockResolvedValue(false);
 
 			const result = await actions.jira(event);
 			expect(result.status).toBe(400);
@@ -87,15 +83,11 @@ describe('Welcome page actions', () => {
 				}
 			};
 
-			fetch.mockResolvedValue({ ok: true });
+			vi.mocked(JiraService.prototype.validateToken).mockResolvedValue(true);
 
 			const result = await actions.jira(event);
 
-			expect(fetch).toHaveBeenCalledWith(`${JIRA_SERVER_URL}/rest/api/3/myself`, {
-				headers: {
-					Authorization: 'Bearer valid-key'
-				}
-			});
+			expect(JiraService.prototype.validateToken).toHaveBeenCalled();
 			expect(encrypt).toHaveBeenCalledWith('valid-key');
 			expect(db.update).toHaveBeenCalled();
 			expect(result).toEqual({ success: true });

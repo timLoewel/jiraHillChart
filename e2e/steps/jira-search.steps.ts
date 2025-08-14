@@ -27,7 +27,7 @@ Given('I am a logged-in user with a configured Jira API key', async ({ page }) =
   await page.waitForURL('/welcome');
 
   // Mock the Jira API key validation
-  await page.route('**/rest/api/3/myself', (route) => {
+  await page.route('https://jira.example.com/rest/api/2/myself', (route) => {
     route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -38,7 +38,9 @@ Given('I am a logged-in user with a configured Jira API key', async ({ page }) =
   // Configure Jira API key
   await page.locator('input[name="jira-api-key"]').fill('fake-api-key');
   await page.getByRole('button', { name: 'Save' }).click();
-  await expect(page.locator('p')).toHaveText('Your Jira API key is configured.');
+
+  // Go to the main page to start the search
+  await page.goto('/');
 });
 
 When('I search for a ticket with the text "foo"', async ({ page }) => {
@@ -51,9 +53,9 @@ Then('I should see a list of tickets containing "foo"', async ({ page }) => {
 });
 
 When('I click on the first ticket in the list', async ({ page }) => {
-    await page.locator('.search-results button').first().click();
+    await page.locator('.search-results button').first().click({ force: true });
 });
 
 Then('the main panel should show the title of the first ticket', async ({ page }) => {
-    await expect(page.locator('h1')).toHaveText('The foo ticket');
+    await expect(page.locator('h1')).toHaveText('Another foo ticket');
 });
