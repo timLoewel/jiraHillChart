@@ -1,7 +1,7 @@
 import { json, error, redirect } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { decrypt } from '$lib/server/crypto';
-import { JIRA_SERVER_URL } from '$env/static/private';
+import { JIRA_SERVER_URL, BYPASS_JIRA_VALIDATION } from '$env/static/private';
 import { logger } from '$lib/server/logger';
 import { Agent } from 'https';
 
@@ -15,6 +15,37 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 			url: url.pathname + url.search
 		});
 		throw error(401, 'Unauthorized');
+	}
+
+	if (BYPASS_JIRA_VALIDATION) {
+		logger.warn('Jira search is being bypassed.', {
+			operation: 'jira_search',
+			userId: user.id,
+			username: user.username
+		});
+
+		let decryptedKey = '';
+		if (user.jiraApiKey) {
+			try {
+				decryptedKey = decrypt(user.jiraApiKey);
+			} catch (e) {
+				logger.error('Failed to decrypt Jira API key in bypass mode', {
+					operation: 'jira_search',
+					userId: user.id,
+					error: e instanceof Error ? e.message : 'Unknown error'
+				});
+			}
+		}
+
+		if (decryptedKey === 'invalid-api-key') {
+			logger.info('Simulating failed authentication, returning 401.', {
+				operation: 'jira_search',
+				userId: user.id,
+				username: user.username
+			});
+			return json({ error: 'invalid_token' }, { status: 401 });
+		}
+		return json([]);
 	}
 
 	if (!user.jiraApiKey) {

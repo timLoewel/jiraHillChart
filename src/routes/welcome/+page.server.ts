@@ -13,9 +13,16 @@ import https from 'https';
 
 export const prerender = false;
 
-export const load: PageServerLoad = async () => {
+export const load: PageServerLoad = async ({ url }) => {
 	const user = requireLogin();
-	return { user };
+	const error = url.searchParams.get('error');
+
+	if (error === 'invalid_token') {
+		// To prevent the "Jira API key is configured" message from showing
+		user.jiraApiKey = null;
+	}
+
+	return { user, error };
 };
 
 export const actions: Actions = {

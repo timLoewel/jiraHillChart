@@ -11,6 +11,9 @@
 {#if $ticket}
 	<h1>{$ticket.title}</h1>
 {:else}
+	{#if data.error === 'invalid_token'}
+		<p class="error">Your Jira API key is invalid or has expired.</p>
+	{/if}
 	<h1>Hi, {data.user.username}!</h1>
 	<p>Your user ID is {data.user.id}.</p>
 

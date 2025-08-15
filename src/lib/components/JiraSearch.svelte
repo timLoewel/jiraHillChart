@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { selectedTicket } from '$lib/stores/selectedTicket';
+	import { goto } from '$app/navigation';
 
 	let searchTerm = '';
 	let searchResults: { id: string; title: string }[] = [];
@@ -14,6 +15,13 @@
 		if (response.ok) {
 			searchResults = await response.json();
 		} else {
+			if (response.status === 401) {
+				const { error } = await response.json();
+				if (error === 'invalid_token') {
+					await goto('/welcome?error=invalid_token');
+					return;
+				}
+			}
 			console.error('Failed to fetch search results');
 			searchResults = [];
 		}
