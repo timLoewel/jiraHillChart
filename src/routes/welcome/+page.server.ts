@@ -6,7 +6,7 @@ import { encrypt } from '$lib/server/crypto';
 import { db } from '$lib/server/db';
 import * as table from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
-import { JIRA_SERVER_URL } from '$env/static/private';
+import { JIRA_SERVER_URL, BYPASS_JIRA_VALIDATION } from '$env/static/private';
 import { logger } from '$lib/server/logger';
 import { Agent } from 'https';
 import https from 'https';
@@ -57,6 +57,22 @@ export const actions: Actions = {
 		});
 
 		try {
+			if (BYPASS_JIRA_VALIDATION === 'true') {
+				logger.warn('Jira API validation is bypassed.', {
+					operation: 'jira_api_key_validation',
+					userId: user.id,
+					username: user.username
+				});
+
+				const encryptedKey = encrypt(jiraApiKey);
+
+				await db
+					.update(table.user)
+					.set({ jiraApiKey: encryptedKey })
+					.where(eq(table.user.id, user.id));
+
+				return { success: true };
+			}
 			logger.info('Creating HTTPS agent with SSL verification disabled', {
 				operation: 'jira_api_key_validation',
 				userId: user.id,
