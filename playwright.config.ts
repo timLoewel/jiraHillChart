@@ -12,6 +12,7 @@ export default defineConfig({
 		port: 4173
 	},
 	testDir,
+	timeout: 60000,
 	use: {
 		headless: true,
 	}

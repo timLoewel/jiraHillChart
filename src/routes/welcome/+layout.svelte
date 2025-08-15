@@ -1,11 +1,13 @@
 <script lang="ts">
 	import JiraSearch from '$lib/components/JiraSearch.svelte';
-	let { children } = $props();
+	let { data, children } = $props();
 </script>
 
 <div class="welcome-layout">
 	<aside class="sidebar">
-		<JiraSearch />
+		{#if data.user.jiraApiKey}
+			<JiraSearch />
+		{/if}
 	</aside>
 	<main class="main-content">
 		{@render children()}

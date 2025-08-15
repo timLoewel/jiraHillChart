@@ -217,6 +217,7 @@ export const actions: Actions = {
 				return fail(500, { error: `Network error connecting to Jira API: ${errorMessage}` });
 			}
 		}
+
 	}
 };
 

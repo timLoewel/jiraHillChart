@@ -97,13 +97,6 @@
 		border-bottom: 1px solid #eee;
 	}
 
-	a {
-		display: flex;
-		flex-direction: column;
-		text-decoration: none;
-		color: inherit;
-	}
-
 	.ticket-id {
 		font-weight: bold;
 	}
