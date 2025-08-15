@@ -2,10 +2,12 @@
 	import { enhance } from '$app/forms';
 	import type { PageServerData, ActionData } from './$types';
 	import { selectedTicket } from '$lib/stores/selectedTicket';
+	import { page } from '$app/stores';
 
 	let { data, form }: { data: PageServerData, form: ActionData } = $props();
 
 	const ticket = selectedTicket;
+	const error = $page.url.searchParams.get('error');
 </script>
 
 {#if $ticket}
@@ -14,7 +16,11 @@
 	<h1>Hi, {data.user.username}!</h1>
 	<p>Your user ID is {data.user.id}.</p>
 
-	{#if data.user.jiraApiKey}
+	{#if error === 'invalid_token'}
+		<p style="color: red;">Your Jira API key is invalid or has expired. Please enter a new one.</p>
+	{/if}
+
+	{#if data.user.jiraApiKey && error !== 'invalid_token'}
 		<p>Your Jira API key is configured.</p>
 	{:else}
 		<form method="post" action="?/jira">
