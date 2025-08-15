@@ -1,68 +1,19 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { db } from '$lib/server/db';
+import * as schema from '$lib/server/db/schema';
+import { eq } from 'drizzle-orm';
 
-// Mock the native https module.
-// All variables used by the factory must be defined inside it to avoid hoisting issues.
-vi.mock('https', () => {
-	class MockAgent {
-		constructor(options?: any) {}
-	}
-
-	const mockRequest = {
-		on: vi.fn().mockReturnThis(),
-		end: vi.fn(),
-		destroy: vi.fn(),
-		write: vi.fn()
-	};
-
-	const mockResponse = {
-		on: vi.fn((event, callback) => {
-			if (event === 'data') {
-				callback('{}'); // Simulate empty JSON response
-			}
-			if (event === 'end') {
-				callback();
-			}
-			return mockResponse;
-		}),
-		statusCode: 200
-	};
-
-	const request = vi.fn((options, callback) => {
-		if (callback) {
-			callback(mockResponse);
-		}
-		return mockRequest;
-	});
-
-	return {
-		default: { request, Agent: MockAgent },
-		request,
-		Agent: MockAgent,
-		// Expose internals for test manipulation
-		__mockResponse: mockResponse
-	};
-});
-
-import { actions } from './+page.server';
-// Import the default and all named exports from the mocked module
-import https, * as httpsMock from 'https';
-
-// Mock other dependencies
-vi.mock('$lib/server/db', () => ({
-	db: {
-		update: vi.fn().mockReturnThis(),
-		set: vi.fn().mockReturnThis(),
-		where: vi.fn().mockResolvedValue(undefined)
-	}
-}));
+// Mock the global fetch function
+global.fetch = vi.fn();
 
 vi.mock('$lib/server/crypto', () => ({
-	encrypt: vi.fn((text) => `encrypted-${text}`)
+	encrypt: vi.fn((text) => `encrypted-${text}`),
+	decrypt: vi.fn((text) => text.replace('encrypted-', ''))
 }));
 
 vi.mock('$env/static/private', () => ({
 	JIRA_SERVER_URL: 'https://jira.example.com',
-	BYPASS_JIRA_VALIDATION: 'false'
+	DATABASE_URL: 'file::memory:?cache=shared'
 }));
 
 vi.mock('$app/server', () => ({
@@ -77,13 +28,23 @@ vi.mock('$app/server', () => ({
 	}))
 }));
 
-describe('Welcome page actions', () => {
-	// Cast to any to access the mock internals we exposed on the named exports
-	const mockInternals = httpsMock as any;
+import { actions } from './+page.server';
 
-	beforeEach(() => {
-		vi.clearAllMocks();
-		mockInternals.__mockResponse.statusCode = 200;
+describe('Welcome page actions', () => {
+	beforeEach(async () => {
+		// Create a test user before each test
+		await db.insert(schema.user).values({
+			id: 'user-123',
+			username: 'testuser',
+			passwordHash: 'hashed-password'
+		});
+		(fetch as any).mockClear();
+	});
+
+	afterEach(async () => {
+		// Clean up the user after each test
+		await db.delete(schema.user).where(eq(schema.user.id, 'user-123'));
+		vi.resetAllMocks();
 	});
 
 	describe('jira action', () => {
@@ -97,7 +58,7 @@ describe('Welcome page actions', () => {
 				}
 			};
 
-			const result = await actions.jira(event);
+			const result = await actions.jira(event as any);
 			expect(result.status).toBe(400);
 			expect(result.data.error).toBe('Jira API key is required');
 		});
@@ -114,15 +75,18 @@ describe('Welcome page actions', () => {
 				}
 			};
 
-			mockInternals.__mockResponse.statusCode = 401;
+			(fetch as any).mockResolvedValue({
+				ok: false,
+				status: 401,
+				text: () => Promise.resolve('Unauthorized')
+			});
 
-			const result = await actions.jira(event);
+			const result = await actions.jira(event as any);
 			expect(result.status).toBe(400);
 			expect(result.data.error).toBe('Invalid Jira API key');
 		});
 
 		it('should encrypt and save the API key on valid submission', async () => {
-			const { db } = await import('$lib/server/db');
 			const { encrypt } = await import('$lib/server/crypto');
 			const formData = new URLSearchParams();
 			formData.set('jira-api-key', 'valid-key');
@@ -135,18 +99,25 @@ describe('Welcome page actions', () => {
 				}
 			};
 
-			mockInternals.__mockResponse.statusCode = 200;
+			(fetch as any).mockResolvedValue({
+				ok: true,
+				json: () => Promise.resolve({ success: true })
+			});
 
-			const result = await actions.jira(event);
+			const result = await actions.jira(event as any);
 
-			expect(https.request).toHaveBeenCalled();
-			const requestOptions = vi.mocked(https.request).mock.calls[0][0];
-			expect(requestOptions.hostname).toBe('jira.example.com');
-			expect(requestOptions.path).toBe('/rest/api/2/myself');
-			expect(requestOptions.headers['Authorization']).toBe('Bearer valid-key');
+			expect(fetch).toHaveBeenCalled();
+			const fetchCall = (fetch as any).mock.calls[0];
+			expect(fetchCall[0]).toBe('https://jira.example.com/rest/api/2/myself');
+			expect(fetchCall[1].headers['Authorization']).toBe('Bearer valid-key');
 			expect(encrypt).toHaveBeenCalledWith('valid-key');
-			expect(db.update).toHaveBeenCalled();
 			expect(result).toEqual({ success: true });
+
+			// Verify the key was saved in the db
+			const updatedUser = await db.query.user.findFirst({
+				where: eq(schema.user.id, 'user-123')
+			});
+			expect(updatedUser?.jiraApiKey).toBe('encrypted-valid-key');
 		});
 	});
 });

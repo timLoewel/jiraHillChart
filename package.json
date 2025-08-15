@@ -17,7 +17,7 @@
 		"test:setup": "rm -f db.sqlite && npm run db:push",
 		"test:e2e": "npm run test:setup && playwright test",
 		"test:bdd": "npm run test:setup && bddgen test && playwright test",
-		"db:push": "drizzle-kit push --force",
+		"db:push": "DATABASE_URL='file:/app/db.sqlite' drizzle-kit push --force",
 		"db:generate": "drizzle-kit generate",
 		"db:migrate": "drizzle-kit migrate",
 		"db:studio": "drizzle-kit studio"

@@ -1,9 +1,7 @@
 import { json, error, redirect } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { decrypt } from '$lib/server/crypto';
-import { JIRA_SERVER_URL, BYPASS_JIRA_VALIDATION } from '$env/static/private';
 import { logger } from '$lib/server/logger';
-import { Agent } from 'https';
+import { getJiraService, JiraError } from '$lib/server/jira';
 
 export const GET: RequestHandler = async ({ url, locals }) => {
 	const startTime = Date.now();
@@ -15,47 +13,6 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 			url: url.pathname + url.search
 		});
 		throw error(401, 'Unauthorized');
-	}
-
-	if (BYPASS_JIRA_VALIDATION) {
-		logger.warn('Jira search is being bypassed.', {
-			operation: 'jira_search',
-			userId: user.id,
-			username: user.username
-		});
-
-		let decryptedKey = '';
-		if (user.jiraApiKey) {
-			try {
-				decryptedKey = decrypt(user.jiraApiKey);
-			} catch (e) {
-				logger.error('Failed to decrypt Jira API key in bypass mode', {
-					operation: 'jira_search',
-					userId: user.id,
-					error: e instanceof Error ? e.message : 'Unknown error'
-				});
-			}
-		}
-
-		if (decryptedKey === 'invalid-api-key') {
-			logger.info('Simulating failed authentication, returning 401.', {
-				operation: 'jira_search',
-				userId: user.id,
-				username: user.username
-			});
-			return json({ error: 'invalid_token' }, { status: 401 });
-		}
-		return json([]);
-	}
-
-	if (!user.jiraApiKey) {
-		logger.warn('Jira search attempted without configured API key', {
-			operation: 'jira_search',
-			userId: user.id,
-			username: user.username,
-			url: url.pathname + url.search
-		});
-		throw error(400, 'Jira API key not configured');
 	}
 
 	const searchTerm = url.searchParams.get('term');
@@ -77,87 +34,10 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		url: url.pathname + url.search
 	});
 
-	let decryptedApiKey: string;
 	try {
-		decryptedApiKey = decrypt(user.jiraApiKey);
-		logger.info('Successfully decrypted Jira API key', {
-			operation: 'jira_search',
-			userId: user.id,
-			username: user.username
-		});
-	} catch (decryptError) {
-		logger.error('Failed to decrypt Jira API key', {
-			operation: 'jira_search',
-			userId: user.id,
-			username: user.username,
-			error: decryptError instanceof Error ? decryptError.message : 'Unknown error'
-		});
-		throw error(500, 'Failed to decrypt Jira API key');
-	}
-
-		const jql = `
-    (
-      issuekey ~ "${searchTerm}" OR
-      summary ~ "${searchTerm}" OR
-      creator ~ "${searchTerm}" OR
-      assignee ~ "${searchTerm}"
-    )
-  `;
-
-	const jiraUrl = `${JIRA_SERVER_URL}/rest/api/2/search`;
-
-	logger.logJiraRequest('search_issues', jiraUrl, {
-		userId: user.id,
-		username: user.username,
-		searchTerm,
-		jql: jql.trim()
-	});
-
-	try {
-		const httpsAgent = new Agent({ rejectUnauthorized: false });
-		const response = await fetch(jiraUrl, {
-			method: 'POST',
-			headers: {
-				'Authorization': `Bearer ${decryptedApiKey}`,
-				'Accept': 'application/json',
-				'Content-Type': 'application/json'
-			},
-			body: JSON.stringify({
-				jql: jql,
-				fields: ['summary']
-			}),
-			// @ts-ignore - Node.js specific option
-			agent: httpsAgent
-		});
-
+		const jiraService = getJiraService(user);
+		const issues = await jiraService.search(searchTerm);
 		const duration = Date.now() - startTime;
-
-		if (!response.ok) {
-			const errorText = await response.text();
-			logger.logJiraResponse('search_issues', jiraUrl, response.status, duration, {
-				userId: user.id,
-				username: user.username,
-				searchTerm,
-				error: errorText
-			});
-			if (response.status === 401) {
-				throw redirect(303, '/welcome?error=invalid_token');
-			}
-			throw error(response.status, `Jira API error: ${errorText}`);
-		}
-
-		logger.logJiraResponse('search_issues', jiraUrl, response.status, duration, {
-			userId: user.id,
-			username: user.username,
-			searchTerm
-		});
-
-		const data = await response.json();
-
-		const issues = data.issues.map((issue: any) => ({
-			id: issue.key,
-			title: issue.fields.summary
-		}));
 
 		logger.info('Jira search completed successfully', {
 			operation: 'jira_search',
@@ -169,39 +49,14 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		});
 
 		return json(issues);
-	} catch (fetchError) {
-		const duration = Date.now() - startTime;
-
-		if (fetchError instanceof Error && 'status' in fetchError) {
-			// This is a SvelteKit error, already logged above
-			throw fetchError;
+	} catch (e) {
+		if (e instanceof JiraError) {
+			if (e.status === 401) {
+				throw redirect(303, '/welcome?error=invalid_token');
+			}
+			throw error(e.status, e.message);
 		}
-
-		// Log detailed error information
-		const errorMessage = fetchError instanceof Error ? fetchError.message : String(fetchError);
-		const errorName = fetchError instanceof Error ? fetchError.name : 'Unknown';
-		const errorStack = fetchError instanceof Error ? fetchError.stack : undefined;
-
-		logger.logJiraError('search_issues', jiraUrl, errorMessage, {
-			userId: user.id,
-			username: user.username,
-			searchTerm,
-			duration,
-			errorName,
-			errorStack: errorStack?.substring(0, 200) // Limit stack trace length
-		});
-
-		// Provide more specific error message based on error type
-		if (errorMessage.includes('ENOTFOUND') || errorMessage.includes('getaddrinfo')) {
-			throw error(500, `DNS resolution failed for Jira server: ${JIRA_SERVER_URL}`);
-		} else if (errorMessage.includes('ECONNREFUSED') || errorMessage.includes('ECONNRESET')) {
-			throw error(500, `Connection refused to Jira server: ${JIRA_SERVER_URL}`);
-		} else if (errorMessage.includes('ETIMEDOUT') || errorMessage.includes('timeout')) {
-			throw error(500, `Connection timeout to Jira server: ${JIRA_SERVER_URL}`);
-		} else if (errorMessage.includes('CERTIFICATE')) {
-			throw error(500, `SSL certificate error with Jira server: ${JIRA_SERVER_URL}`);
-		} else {
-			throw error(500, `Network error connecting to Jira API: ${errorMessage}`);
-		}
+		// Let SvelteKit handle other errors (like the one from getJiraService)
+		throw e;
 	}
 };

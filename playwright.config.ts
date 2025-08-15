@@ -2,18 +2,31 @@ import { defineConfig, devices } from '@playwright/test';
 import { defineBddConfig } from 'playwright-bdd';
 
 const testDir = defineBddConfig({
-  features: 'e2e/features/*.feature',
-  steps: 'e2e/steps/*.ts',
+	paths: ['e2e/features/**/*.feature'],
+	require: ['e2e/steps/**/*.ts'],
+	outputDir: '.features-gen/e2e/features'
 });
 
 export default defineConfig({
-	webServer: {
-		command: 'npm run build && npm run preview',
-		port: 4173
-	},
 	testDir,
-	timeout: 60000,
+	fullyParallel: true,
+	forbidOnly: !!process.env.CI,
+	retries: process.env.CI ? 2 : 0,
+	workers: process.env.CI ? 1 : undefined,
+	reporter: 'html',
 	use: {
-		headless: true,
+		baseURL: 'http://127.0.0.1:5173',
+		trace: 'on-first-retry'
+	},
+	projects: [
+		{
+			name: 'chromium',
+			use: { ...devices['Desktop Chrome'] }
+		}
+	],
+	webServer: {
+		command: 'E2E_TEST=true npm run dev',
+		url: 'http://127.0.0.1:5173',
+		reuseExistingServer: !process.env.CI
 	}
 });

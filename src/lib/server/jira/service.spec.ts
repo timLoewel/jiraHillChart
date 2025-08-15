@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { JiraService, JiraError } from './jira';
+import { JiraService, JiraError } from './service';
 
 // Mock the logger and JIRA_SERVER_URL
 vi.mock('$lib/server/logger', () => ({
