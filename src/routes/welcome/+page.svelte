@@ -17,7 +17,7 @@
 	{#if data.user.jiraApiKey}
 		<p>Your Jira API key is configured.</p>
 	{:else}
-		<form method="post" action="?/jira" use:enhance>
+		<form method="post" action="?/jira">
 			<h2>Connect to Jira</h2>
 			<p>
 				Enter your Jira API key to connect your account.
