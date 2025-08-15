@@ -1,8 +1,53 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { actions } from './+page.server';
-import { JiraService } from '$lib/server/jira';
 
-// Mock dependencies
+// Mock the native https module.
+// All variables used by the factory must be defined inside it to avoid hoisting issues.
+vi.mock('https', () => {
+	class MockAgent {
+		constructor(options?: any) {}
+	}
+
+	const mockRequest = {
+		on: vi.fn().mockReturnThis(),
+		end: vi.fn(),
+		destroy: vi.fn(),
+		write: vi.fn()
+	};
+
+	const mockResponse = {
+		on: vi.fn((event, callback) => {
+			if (event === 'data') {
+				callback('{}'); // Simulate empty JSON response
+			}
+			if (event === 'end') {
+				callback();
+			}
+			return mockResponse;
+		}),
+		statusCode: 200
+	};
+
+	const request = vi.fn((options, callback) => {
+		if (callback) {
+			callback(mockResponse);
+		}
+		return mockRequest;
+	});
+
+	return {
+		default: { request, Agent: MockAgent },
+		request,
+		Agent: MockAgent,
+		// Expose internals for test manipulation
+		__mockResponse: mockResponse
+	};
+});
+
+import { actions } from './+page.server';
+// Import the default and all named exports from the mocked module
+import https, * as httpsMock from 'https';
+
+// Mock other dependencies
 vi.mock('$lib/server/db', () => ({
 	db: {
 		update: vi.fn().mockReturnThis(),
@@ -15,7 +60,10 @@ vi.mock('$lib/server/crypto', () => ({
 	encrypt: vi.fn((text) => `encrypted-${text}`)
 }));
 
-vi.mock('$lib/server/jira');
+vi.mock('$env/static/private', () => ({
+	JIRA_SERVER_URL: 'https://jira.example.com',
+	BYPASS_JIRA_VALIDATION: 'false'
+}));
 
 vi.mock('$app/server', () => ({
 	getRequestEvent: vi.fn(() => ({
@@ -30,8 +78,12 @@ vi.mock('$app/server', () => ({
 }));
 
 describe('Welcome page actions', () => {
+	// Cast to any to access the mock internals we exposed on the named exports
+	const mockInternals = httpsMock as any;
+
 	beforeEach(() => {
 		vi.clearAllMocks();
+		mockInternals.__mockResponse.statusCode = 200;
 	});
 
 	describe('jira action', () => {
@@ -62,7 +114,7 @@ describe('Welcome page actions', () => {
 				}
 			};
 
-			vi.mocked(JiraService.prototype.validateToken).mockResolvedValue(false);
+			mockInternals.__mockResponse.statusCode = 401;
 
 			const result = await actions.jira(event);
 			expect(result.status).toBe(400);
@@ -83,11 +135,15 @@ describe('Welcome page actions', () => {
 				}
 			};
 
-			vi.mocked(JiraService.prototype.validateToken).mockResolvedValue(true);
+			mockInternals.__mockResponse.statusCode = 200;
 
 			const result = await actions.jira(event);
 
-			expect(JiraService.prototype.validateToken).toHaveBeenCalled();
+			expect(https.request).toHaveBeenCalled();
+			const requestOptions = vi.mocked(https.request).mock.calls[0][0];
+			expect(requestOptions.hostname).toBe('jira.example.com');
+			expect(requestOptions.path).toBe('/rest/api/2/myself');
+			expect(requestOptions.headers['Authorization']).toBe('Bearer valid-key');
 			expect(encrypt).toHaveBeenCalledWith('valid-key');
 			expect(db.update).toHaveBeenCalled();
 			expect(result).toEqual({ success: true });

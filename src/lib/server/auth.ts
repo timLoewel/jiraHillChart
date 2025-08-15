@@ -49,25 +49,6 @@ export async function validateSessionToken(token: string) {
 	}
 	const { session, user } = result;
 
-	if (user.jiraApiKey) {
-		try {
-			user.jiraApiKey = decrypt(user.jiraApiKey);
-			logger.info('Successfully decrypted Jira API key during session validation', {
-				operation: 'session_validation',
-				userId: user.id,
-				username: user.username
-			});
-		} catch (decryptError) {
-			logger.error('Failed to decrypt Jira API key during session validation', {
-				operation: 'session_validation',
-				userId: user.id,
-				username: user.username,
-				error: decryptError instanceof Error ? decryptError.message : 'Unknown error'
-			});
-			// Continue without the Jira API key rather than failing the entire session
-			user.jiraApiKey = null;
-		}
-	}
 
 	const sessionExpired = Date.now() >= session.expiresAt.getTime();
 	if (sessionExpired) {

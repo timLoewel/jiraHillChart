@@ -7,14 +7,8 @@ const username = `testuser_${Math.random().toString(36).substring(7)}`;
 const password = 'password123';
 
 Given('I am a logged-in user with an invalid Jira API key', async ({ page }) => {
-	// Mock the Jira API search endpoint to return a 401
-	await page.route('**/api/jira/search?term=foo', (route) => {
-		route.fulfill({
-			status: 401,
-			contentType: 'application/json',
-			body: JSON.stringify({ message: 'Unauthorized' })
-		});
-	});
+	// The server is now mocked via an environment variable,
+	// so no client-side route mocking is needed for this step.
 
 	// Register and login
 	await page.goto('/');
@@ -37,7 +31,7 @@ Given('I am a logged-in user with an invalid Jira API key', async ({ page }) => 
 	// Configure Jira API key
 	await page.locator('input[name="jira-api-key"]').fill('invalid-api-key');
 	await page.getByRole('button', { name: 'Save' }).click();
-	await page.waitForURL('/');
+	await expect(page.getByText('Your Jira API key is configured.')).toBeVisible();
 });
 
 
